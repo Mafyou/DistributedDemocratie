@@ -1,0 +1,58 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <i class="bi bi-house-heart"></i> Démocratie Distribuée
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Accueil
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="laws">
+                <span class="bi bi-journal-text" aria-hidden="true"></span> Lois et Décrets
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="active-votes">
+                <span class="bi bi-ballot-check" aria-hidden="true"></span> Votes actifs
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="propose-law">
+                <span class="bi bi-plus-circle" aria-hidden="true"></span> Proposer une loi
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="my-votes">
+                <span class="bi bi-person-check" aria-hidden="true"></span> Mes votes
+            </NavLink>
+        </div>
+
+        <hr class="nav-divider" />
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="statistics">
+                <span class="bi bi-bar-chart" aria-hidden="true"></span> Statistiques
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="about">
+                <span class="bi bi-info-circle" aria-hidden="true"></span> À propos
+            </NavLink>
+        </div>
+    </nav>
+</div>
+

@@ -1,0 +1,297 @@
+﻿@page "/"
+@rendermode InteractiveAuto
+@using DistributedDemocratie.Models
+@using DistributedDemocratie.Services
+@inject ILawService LawService
+@inject NavigationManager Navigation
+
+<PageTitle>Démocratie Distribuée - Le pouvoir au peuple</PageTitle>
+
+<div class="hero-section bg-primary text-white py-5 mb-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-4 fw-bold">🏛️ Démocratie Distribuée</h1>
+                <p class="lead fs-4">Le pouvoir souverain rendu au peuple</p>
+                <p class="fs-5">Votez directement sur les lois et décrets. Participez à une démocratie transparente et décentralisée où chaque voix compte.</p>
+                <div class="mt-4">
+                    <a href="/laws" class="btn btn-light btn-lg me-3">
+                        <i class="bi bi-ballot-check"></i> Voir les votes
+                    </a>
+                    <button class="btn btn-outline-light btn-lg" @onclick="ScrollToHow">
+                        <i class="bi bi-question-circle"></i> Comment ça marche ?
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4 text-center">
+                <i class="bi bi-people-fill display-1"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Statistiques -->
+    <div class="row mb-5">
+        <div class="col-md-4 text-center">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <i class="bi bi-ballot-check display-4 text-success"></i>
+                    <h3 class="mt-3">@activeVotingLaws.Count</h3>
+                    <p class="lead">Votes actifs</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 text-center">
+            <div class="card h-100 border-primary">
+                <div class="card-body">
+                    <i class="bi bi-journal-text display-4 text-primary"></i>
+                    <h3 class="mt-3">@totalLaws</h3>
+                    <p class="lead">Lois proposées</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 text-center">
+            <div class="card h-100 border-info">
+                <div class="card-body">
+                    <i class="bi bi-people display-4 text-info"></i>
+                    <h3 class="mt-3">@totalVotes</h3>
+                    <p class="lead">Votes exprimés</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Votes actifs -->
+    @if (activeVotingLaws.Any())
+    {
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="bi bi-ballot-check text-success"></i> Votes en cours</h2>
+                    <a href="/laws" class="btn btn-outline-primary">Voir tous les votes</a>
+                </div>
+                <div class="row">
+                    @foreach (var law in activeVotingLaws.Take(3))
+                    {
+                        <div class="col-md-4 mb-4">
+                            <div class="card h-100 border-success">
+                                <div class="card-header bg-success text-white">
+                                    <div class="d-flex justify-content-between">
+                                        <span class="badge bg-light text-dark">@GetTypeName(law.Type)</span>
+                                        <small><i class="bi bi-clock"></i> @GetTimeRemaining(law)</small>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">@law.Title</h5>
+                                    <p class="card-text">@law.Description</p>
+                                    <div class="progress mb-2" style="height: 15px;">
+                                        <div class="progress-bar bg-success" role="progressbar" 
+                                             style="width: @(GetVotePercentage(law, VoteChoice.For))%" 
+                                             title="Pour: @law.VotesFor">
+                                        </div>
+                                        <div class="progress-bar bg-danger" role="progressbar" 
+                                             style="width: @(GetVotePercentage(law, VoteChoice.Against))%" 
+                                             title="Contre: @law.VotesAgainst">
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">@law.TotalVotes votes exprimés</small>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-success w-100" @onclick="() => ViewLaw(law.Id)">
+                                        <i class="bi bi-ballot-check"></i> Voter maintenant
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Comment ça marche -->
+    <div id="how-it-works" class="row mb-5">
+        <div class="col-12">
+            <h2 class="text-center mb-5"><i class="bi bi-question-circle"></i> Comment ça marche ?</h2>
+            <div class="row">
+                <div class="col-md-3 text-center mb-4">
+                    <div class="step-icon bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <span class="h3 mb-0">1</span>
+                    </div>
+                    <h4 class="mt-3">Authentification</h4>
+                    <p>Connectez-vous de manière sécurisée avec France Connect pour vérifier votre identité de citoyen français.</p>
+                </div>
+                <div class="col-md-3 text-center mb-4">
+                    <div class="step-icon bg-success text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <span class="h3 mb-0">2</span>
+                    </div>
+                    <h4 class="mt-3">Consultation</h4>
+                    <p>Parcourez les lois et décrets proposés par les citoyens. Lisez le texte complet et les arguments.</p>
+                </div>
+                <div class="col-md-3 text-center mb-4">
+                    <div class="step-icon bg-warning text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <span class="h3 mb-0">3</span>
+                    </div>
+                    <h4 class="mt-3">Vote</h4>
+                    <p>Exprimez votre choix : Pour, Contre ou Abstention. Votre vote est anonyme et sécurisé.</p>
+                </div>
+                <div class="col-md-3 text-center mb-4">
+                    <div class="step-icon bg-info text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <span class="h3 mb-0">4</span>
+                    </div>
+                    <h4 class="mt-3">Application</h4>
+                    <p>Les lois adoptées par la majorité sont automatiquement mises en application. Le peuple décide.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avantages -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <h2 class="text-center mb-5"><i class="bi bi-shield-check"></i> Pourquoi la démocratie distribuée ?</h2>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="bi bi-lightning-charge text-warning fs-1 me-3"></i>
+                                <h4>Transparence totale</h4>
+                            </div>
+                            <p>Tous les votes sont publics, traçables et vérifiables. Fini les décisions prises dans l'ombre.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="bi bi-people text-primary fs-1 me-3"></i>
+                                <h4>Participation directe</h4>
+                            </div>
+                            <p>Plus besoin d'intermédiaires. Chaque citoyen peut proposer et voter directement sur les lois.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="bi bi-clock text-success fs-1 me-3"></i>
+                                <h4>Réactivité</h4>
+                            </div>
+                            <p>Les décisions sont prises rapidement, sans les lenteurs bureaucratiques traditionnelles.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="bi bi-shield-shaded text-info fs-1 me-3"></i>
+                                <h4>Sécurité</h4>
+                            </div>
+                            <p>Système de vote sécurisé avec authentification forte et traçabilité blockchain.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call to action -->
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center py-5">
+                    <h2>Rejoignez la révolution démocratique</h2>
+                    <p class="lead">Votre voix compte. Participez dès maintenant à la construction d'une société plus juste et démocratique.</p>
+                    <div class="mt-4">
+                        <a href="/laws" class="btn btn-light btn-lg me-3">
+                            <i class="bi bi-ballot-check"></i> Commencer à voter
+                        </a>
+                        <button class="btn btn-outline-light btn-lg">
+                            <i class="bi bi-person-plus"></i> S'inscrire
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Law> activeVotingLaws = new();
+    private int totalLaws = 0;
+    private int totalVotes = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        var allLaws = await LawService.GetLawsAsync();
+        activeVotingLaws = await LawService.GetActiveVotingLawsAsync();
+        
+        totalLaws = allLaws.Count;
+        totalVotes = allLaws.Sum(l => l.TotalVotes);
+        
+        StateHasChanged();
+    }
+
+    private void ViewLaw(int lawId)
+    {
+        Navigation.NavigateTo($"/law/{lawId}");
+    }
+
+    private async Task ScrollToHow()
+    {
+        await Task.Delay(100); // Petit délai pour assurer le rendu
+        // TODO: Implémenter le scroll smooth avec JS
+    }
+
+    private string GetTypeName(LawType type)
+    {
+        return type switch
+        {
+            LawType.Law => "Loi",
+            LawType.Decree => "Décret",
+            LawType.Amendment => "Amendement",
+            LawType.Referendum => "Référendum",
+            LawType.LocalInitiative => "Initiative locale",
+            _ => type.ToString()
+        };
+    }
+
+    private string GetTimeRemaining(Law law)
+    {
+        if (law.VotingEndDate == null) return "Permanent";
+        
+        var timeLeft = law.VotingEndDate.Value - DateTime.Now;
+        if (timeLeft.TotalSeconds <= 0) return "Terminé";
+        
+        if (timeLeft.TotalDays >= 1)
+            return $"{(int)timeLeft.TotalDays}j";
+        
+        if (timeLeft.TotalHours >= 1)
+            return $"{(int)timeLeft.TotalHours}h";
+            
+        return $"{(int)timeLeft.TotalMinutes}m";
+    }
+
+    private double GetVotePercentage(Law law, VoteChoice choice)
+    {
+        if (law.TotalVotes == 0) return 0;
+        
+        return choice switch
+        {
+            VoteChoice.For => (double)law.VotesFor / law.TotalVotes * 100,
+            VoteChoice.Against => (double)law.VotesAgainst / law.TotalVotes * 100,
+            VoteChoice.Abstain => (double)law.VotesAbstain / law.TotalVotes * 100,
+            _ => 0
+        };
+    }
+}

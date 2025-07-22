@@ -1,0 +1,350 @@
+@page "/law/{LawId:int}"
+@rendermode InteractiveAuto
+@using DistributedDemocratie.Models
+@using DistributedDemocratie.Services
+@inject ILawService LawService
+@inject IVotingService VotingService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>@(law?.Title ?? "Loi") - Démocratie Distribuée</PageTitle>
+
+@if (law == null)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/laws">Lois</a></li>
+                        <li class="breadcrumb-item active">@law.Title</li>
+                    </ol>
+                </nav>
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h1>@law.Title</h1>
+                        <div class="mb-2">
+                            <span class="badge @GetTypeColor(law.Type) me-2">@GetTypeName(law.Type)</span>
+                            <span class="badge @GetStatusColor(law.Status)">@GetStatusName(law.Status)</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-secondary" @onclick="ShareLaw">
+                        <i class="bi bi-share"></i> Partager
+                    </button>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Description</h5>
+                        <p class="card-text">@law.Description</p>
+                        
+                        <hr />
+                        
+                        <h5>Texte complet</h5>
+                        <div class="law-text">
+                            @((MarkupString)law.FullText.Replace("\n", "<br>"))
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Informations</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Proposé par:</strong> @law.CreatedBy<br>
+                                <strong>Date de création:</strong> @law.CreatedDate.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                            <div class="col-md-6">
+                                @if (law.VotingStartDate.HasValue)
+                                {
+                                    <strong>Début du vote:</strong> @law.VotingStartDate.Value.ToString("dd/MM/yyyy HH:mm")<br>
+                                }
+                                @if (law.VotingEndDate.HasValue)
+                                {
+                                    <strong>Fin du vote:</strong> @law.VotingEndDate.Value.ToString("dd/MM/yyyy HH:mm")
+                                }
+                            </div>
+                        </div>
+                        
+                        @if (law.Tags.Any())
+                        {
+                            <hr>
+                            <strong>Tags:</strong>
+                            @foreach (var tag in law.Tags)
+                            {
+                                <span class="badge bg-secondary me-1">#@tag</span>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                @if (law.IsVotingActive)
+                {
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-ballot-check"></i> Vote en cours</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (userVote != null)
+                            {
+                                <div class="alert alert-info">
+                                    <i class="bi bi-check-circle"></i>
+                                    Vous avez voté: <strong>@GetVoteChoiceName(userVote.Choice)</strong>
+                                    <br><small>Le @userVote.VotedAt.ToString("dd/MM/yyyy à HH:mm")</small>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success" @onclick="() => VoteFor()" disabled="@isVoting">
+                                        <i class="bi bi-hand-thumbs-up"></i> Pour
+                                    </button>
+                                    <button class="btn btn-danger" @onclick="() => VoteAgainst()" disabled="@isVoting">
+                                        <i class="bi bi-hand-thumbs-down"></i> Contre
+                                    </button>
+                                    <button class="btn btn-warning" @onclick="() => VoteAbstain()" disabled="@isVoting">
+                                        <i class="bi bi-dash-circle"></i> Abstention
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Résultats</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (votingResult != null)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Pour</span>
+                                    <span><strong>@votingResult.VotesFor</strong> (@votingResult.PercentageFor.ToString("F1")%)</span>
+                                </div>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar bg-success" role="progressbar" 
+                                         style="width: @(votingResult.PercentageFor)%"></div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Contre</span>
+                                    <span><strong>@votingResult.VotesAgainst</strong> (@votingResult.PercentageAgainst.ToString("F1")%)</span>
+                                </div>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar bg-danger" role="progressbar" 
+                                         style="width: @(votingResult.PercentageAgainst)%"></div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Abstention</span>
+                                    <span><strong>@votingResult.VotesAbstain</strong> (@votingResult.PercentageAbstain.ToString("F1")%)</span>
+                                </div>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: @(votingResult.PercentageAbstain)%"></div>
+                                </div>
+                            </div>
+
+                            <hr>
+                            <div class="text-center">
+                                <h6>Total des votes: <strong>@votingResult.TotalVotes</strong></h6>
+                                @if (votingResult.TotalVotes > 0)
+                                {
+                                    <p class="@(votingResult.IsPassing ? "text-success" : "text-danger")">
+                                        <i class="bi bi-@(votingResult.IsPassing ? "check" : "x")-circle"></i>
+                                        @(votingResult.IsPassing ? "En voie d'adoption" : "En voie de rejet")
+                                    </p>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (law.IsVotingActive && law.VotingEndDate.HasValue)
+                {
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6><i class="bi bi-clock"></i> Temps restant</h6>
+                            <div id="countdown" class="h4 text-primary">
+                                @GetTimeRemaining()
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int LawId { get; set; }
+    
+    private Law? law;
+    private Vote? userVote;
+    private VotingResult? votingResult;
+    private bool isVoting = false;
+    private string currentUserId = "user_demo"; // TODO: Récupérer depuis l'authentification
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLawDetails();
+    }
+
+    private async Task LoadLawDetails()
+    {
+        law = await LawService.GetLawByIdAsync(LawId);
+        if (law == null)
+        {
+            Navigation.NavigateTo("/laws");
+            return;
+        }
+
+        userVote = await VotingService.GetUserVoteAsync(LawId, currentUserId);
+        votingResult = await VotingService.GetVotingResultsAsync(LawId);
+        StateHasChanged();
+    }
+
+    private async Task VoteFor()
+    {
+        await CastVote(VoteChoice.For);
+    }
+
+    private async Task VoteAgainst()
+    {
+        await CastVote(VoteChoice.Against);
+    }
+
+    private async Task VoteAbstain()
+    {
+        await CastVote(VoteChoice.Abstain);
+    }
+
+    private async Task CastVote(VoteChoice choice)
+    {
+        if (isVoting) return;
+
+        isVoting = true;
+        try
+        {
+            userVote = await VotingService.CastVoteAsync(LawId, currentUserId, choice);
+            votingResult = await VotingService.GetVotingResultsAsync(LawId);
+            
+            // Afficher une notification de succès
+            await JSRuntime.InvokeVoidAsync("alert", $"Votre vote '{GetVoteChoiceName(choice)}' a été enregistré avec succès !");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Erreur lors du vote : {ex.Message}");
+        }
+        finally
+        {
+            isVoting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShareLaw()
+    {
+        var url = Navigation.Uri;
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", url);
+        await JSRuntime.InvokeVoidAsync("alert", "Lien copié dans le presse-papiers !");
+    }
+
+    private string GetTimeRemaining()
+    {
+        if (law?.VotingEndDate == null) return "";
+        
+        var timeLeft = law.VotingEndDate.Value - DateTime.Now;
+        if (timeLeft.TotalSeconds <= 0) return "Vote terminé";
+        
+        if (timeLeft.TotalDays >= 1)
+            return $"{(int)timeLeft.TotalDays}j {timeLeft.Hours}h";
+        
+        return $"{timeLeft.Hours}h {timeLeft.Minutes}m";
+    }
+
+    private string GetVoteChoiceName(VoteChoice choice)
+    {
+        return choice switch
+        {
+            VoteChoice.For => "Pour",
+            VoteChoice.Against => "Contre",
+            VoteChoice.Abstain => "Abstention",
+            _ => choice.ToString()
+        };
+    }
+
+    private string GetTypeColor(LawType type)
+    {
+        return type switch
+        {
+            LawType.Law => "bg-primary",
+            LawType.Decree => "bg-info",
+            LawType.Amendment => "bg-warning",
+            LawType.Referendum => "bg-danger",
+            LawType.LocalInitiative => "bg-success",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetTypeName(LawType type)
+    {
+        return type switch
+        {
+            LawType.Law => "Loi",
+            LawType.Decree => "Décret",
+            LawType.Amendment => "Amendement",
+            LawType.Referendum => "Référendum",
+            LawType.LocalInitiative => "Initiative locale",
+            _ => type.ToString()
+        };
+    }
+
+    private string GetStatusColor(LawStatus status)
+    {
+        return status switch
+        {
+            LawStatus.Voting => "bg-success",
+            LawStatus.UnderReview => "bg-warning",
+            LawStatus.Passed => "bg-success",
+            LawStatus.Rejected => "bg-danger",
+            LawStatus.Draft => "bg-secondary",
+            LawStatus.Implemented => "bg-primary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatusName(LawStatus status)
+    {
+        return status switch
+        {
+            LawStatus.Voting => "En vote",
+            LawStatus.UnderReview => "En révision",
+            LawStatus.Passed => "Adoptée",
+            LawStatus.Rejected => "Rejetée",
+            LawStatus.Draft => "Brouillon",
+            LawStatus.Implemented => "Implémentée",
+            _ => status.ToString()
+        };
+    }
+}

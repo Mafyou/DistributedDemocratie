@@ -1,0 +1,248 @@
+@page "/propose-law"
+@rendermode InteractiveAuto
+@using DistributedDemocratie.Models
+@using DistributedDemocratie.Services
+@inject ILawService LawService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Proposer une Loi - Démocratie Distribuée</PageTitle>
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4">?? Proposer une Loi</h1>
+            <p class="lead">Participez à la démocratie en proposant une nouvelle loi ou un décret. Votre proposition sera soumise au vote de tous les citoyens.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-pencil-square"></i> Nouvelle Proposition</h5>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="newLaw" OnValidSubmit="SubmitLaw">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger" />
+
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Titre de la proposition *</label>
+                            <InputText id="title" class="form-control" @bind-Value="newLaw.Title" placeholder="Ex: Loi sur la transition énergétique" />
+                            <ValidationMessage For="@(() => newLaw.Title)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Type de proposition *</label>
+                            <InputSelect id="type" class="form-select" @bind-Value="newLaw.Type">
+                                <option value="">-- Sélectionnez un type --</option>
+                                <option value="@LawType.Law">Loi</option>
+                                <option value="@LawType.Decree">Décret</option>
+                                <option value="@LawType.Amendment">Amendement</option>
+                                <option value="@LawType.Referendum">Référendum</option>
+                                <option value="@LawType.LocalInitiative">Initiative locale</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => newLaw.Type)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description courte *</label>
+                            <InputTextArea id="description" class="form-control" rows="3" @bind-Value="newLaw.Description" 
+                                           placeholder="Résumé en quelques phrases de votre proposition..." />
+                            <ValidationMessage For="@(() => newLaw.Description)" class="text-danger" />
+                            <div class="form-text">Maximum 500 caractères. Cette description apparaîtra dans la liste des lois.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="fulltext" class="form-label">Texte complet *</label>
+                            <InputTextArea id="fulltext" class="form-control" rows="10" @bind-Value="newLaw.FullText" 
+                                           placeholder="Rédigez ici le texte complet de votre proposition. Soyez précis et détaillé..." />
+                            <ValidationMessage For="@(() => newLaw.FullText)" class="text-danger" />
+                            <div class="form-text">Rédigez le texte complet de votre proposition. Plus vous serez précis, plus les citoyens pourront voter en connaissance de cause.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tags" class="form-label">Tags (optionnel)</label>
+                            <input type="text" id="tags" class="form-control" @bind="tagsInput" 
+                                   placeholder="environnement, économie, social..." />
+                            <div class="form-text">Séparez les tags par des virgules. Cela aide à catégoriser votre proposition.</div>
+                            @if (newLaw.Tags.Any())
+                            {
+                                <div class="mt-2">
+                                    @foreach (var tag in newLaw.Tags)
+                                    {
+                                        <span class="badge bg-secondary me-1">
+                                            #@tag 
+                                            <button type="button" class="btn-close btn-close-white ms-1" @onclick="() => RemoveTag(tag)"></button>
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="createdBy" class="form-label">Proposé par *</label>
+                            <InputText id="createdBy" class="form-control" @bind-Value="newLaw.CreatedBy" 
+                                       placeholder="Votre nom ou le nom de votre organisation" />
+                            <ValidationMessage For="@(() => newLaw.CreatedBy)" class="text-danger" />
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="votingStart" class="form-label">Début du vote (optionnel)</label>
+                                <InputDate Type="InputDateType.DateTimeLocal" id="votingStart" class="form-control" @bind-Value="votingStartDate" />
+                                <div class="form-text">Si non spécifié, le vote commencera immédiatement après validation.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="votingEnd" class="form-label">Fin du vote (optionnel)</label>
+                                <InputDate Type="InputDateType.DateTimeLocal" id="votingEnd" class="form-control" @bind-Value="votingEndDate" />
+                                <div class="form-text">Si non spécifié, le vote durera 30 jours.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-secondary" @onclick="ResetForm">
+                                <i class="bi bi-arrow-clockwise"></i> Réinitialiser
+                            </button>
+                            <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                                @if (isSubmitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                <i class="bi bi-send"></i> Soumettre la proposition
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h6><i class="bi bi-lightbulb"></i> Conseils pour une bonne proposition</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check text-success"></i> Soyez clair et précis dans votre titre</li>
+                        <li><i class="bi bi-check text-success"></i> Expliquez le problème que vous voulez résoudre</li>
+                        <li><i class="bi bi-check text-success"></i> Proposez des solutions concrètes</li>
+                        <li><i class="bi bi-check text-success"></i> Anticipez les conséquences et les coûts</li>
+                        <li><i class="bi bi-check text-success"></i> Utilisez un langage accessible à tous</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h6><i class="bi bi-exclamation-triangle"></i> Processus de validation</h6>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li><strong>Soumission</strong> - Votre proposition est enregistrée</li>
+                        <li><strong>Révision</strong> - Vérification de la légalité et de la clarté</li>
+                        <li><strong>Publication</strong> - Mise en ligne pour consultation</li>
+                        <li><strong>Vote</strong> - Période de vote ouverte aux citoyens</li>
+                        <li><strong>Résultat</strong> - Application si adoptée par la majorité</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h6><i class="bi bi-shield-check"></i> Vos droits</h6>
+                </div>
+                <div class="card-body">
+                    <p class="small mb-2">En soumettant cette proposition, vous acceptez :</p>
+                    <ul class="small">
+                        <li>Que votre proposition soit publique</li>
+                        <li>Qu'elle puisse être modifiée pour des raisons légales</li>
+                        <li>Que le vote soit ouvert à tous les citoyens vérifiés</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private Law newLaw = new();
+    private string tagsInput = "";
+    private DateTime? votingStartDate;
+    private DateTime? votingEndDate;
+    private bool isSubmitting = false;
+
+    protected override void OnInitialized()
+    {
+        ResetForm();
+    }
+
+    private async Task SubmitLaw()
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+
+        try
+        {
+            // Parse tags
+            if (!string.IsNullOrWhiteSpace(tagsInput))
+            {
+                newLaw.Tags = tagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim().ToLower())
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .Distinct()
+                    .ToList();
+            }
+
+            // Set dates
+            newLaw.VotingStartDate = votingStartDate;
+            newLaw.VotingEndDate = votingEndDate;
+
+            // Set default dates if not provided
+            if (!newLaw.VotingStartDate.HasValue)
+                newLaw.VotingStartDate = DateTime.Now;
+            
+            if (!newLaw.VotingEndDate.HasValue)
+                newLaw.VotingEndDate = newLaw.VotingStartDate.Value.AddDays(30);
+
+            // Set initial status
+            newLaw.Status = LawStatus.UnderReview; // Will be changed to Voting after review
+
+            var createdLaw = await LawService.CreateLawAsync(newLaw);
+            
+            await JSRuntime.InvokeVoidAsync("alert", 
+                "Votre proposition a été soumise avec succès ! Elle va être examinée avant d'être mise au vote.");
+            
+            Navigation.NavigateTo($"/law/{createdLaw.Id}");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Erreur lors de la soumission : {ex.Message}");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void ResetForm()
+    {
+        newLaw = new Law
+        {
+            CreatedBy = "Citoyen Anonyme", // TODO: Get from authentication
+            Tags = new List<string>()
+        };
+        tagsInput = "";
+        votingStartDate = null;
+        votingEndDate = null;
+    }
+
+    private void RemoveTag(string tag)
+    {
+        newLaw.Tags.Remove(tag);
+        tagsInput = string.Join(", ", newLaw.Tags);
+        StateHasChanged();
+    }
+}

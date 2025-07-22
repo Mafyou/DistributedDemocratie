@@ -1,0 +1,371 @@
+@page "/statistics"
+@rendermode InteractiveAuto
+@using DistributedDemocratie.Models
+@using DistributedDemocratie.Services
+@inject ILawService LawService
+@inject IVotingService VotingService
+@inject ICitizenService CitizenService
+
+<PageTitle>Statistiques - Démocratie Distribuée</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4">?? Statistiques de la Démocratie</h1>
+            <p class="lead">Transparence totale : découvrez les données en temps réel de notre démocratie participative.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement des statistiques...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Métriques principales -->
+        <div class="row mb-5">
+            <div class="col-md-3 mb-3">
+                <div class="card bg-primary text-white h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-journal-text display-4"></i>
+                        <h2 class="mt-3">@stats.TotalLaws</h2>
+                        <p class="lead">Lois proposées</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-success text-white h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-ballot-check display-4"></i>
+                        <h2 class="mt-3">@stats.ActiveVotes</h2>
+                        <p class="lead">Votes actifs</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-info text-white h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-people display-4"></i>
+                        <h2 class="mt-3">@stats.TotalVotes.ToString("N0")</h2>
+                        <p class="lead">Votes exprimés</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card bg-warning text-white h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-person-check display-4"></i>
+                        <h2 class="mt-3">@stats.RegisteredCitizens</h2>
+                        <p class="lead">Citoyens inscrits</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphiques et analyses -->
+        <div class="row mb-5">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-pie-chart"></i> Répartition par type de loi</h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var typeStats in stats.LawsByType)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>@GetTypeName(typeStats.Key)</span>
+                                    <span><strong>@typeStats.Value</strong> (@(((double)typeStats.Value / stats.TotalLaws * 100).ToString("F1"))%)</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar @GetTypeColor(typeStats.Key)" role="progressbar" 
+                                         style="width: @((double)typeStats.Value / stats.TotalLaws * 100)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-bar-chart"></i> Statut des lois</h5>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var statusStats in stats.LawsByStatus)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>@GetStatusName(statusStats.Key)</span>
+                                    <span><strong>@statusStats.Value</strong> (@(((double)statusStats.Value / stats.TotalLaws * 100).ToString("F1"))%)</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar @GetStatusColor(statusStats.Key)" role="progressbar" 
+                                         style="width: @((double)statusStats.Value / stats.TotalLaws * 100)%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Participation -->
+        <div class="row mb-5">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-graph-up"></i> Lois les plus votées</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (stats.MostVotedLaws.Any())
+                        {
+                            @foreach (var law in stats.MostVotedLaws)
+                            {
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">@law.Title</h6>
+                                            <small class="text-muted">@law.Description</small>
+                                        </div>
+                                        <div class="text-end">
+                                            <span class="badge @GetTypeColor(law.Type)">@GetTypeName(law.Type)</span>
+                                            <br><strong>@law.TotalVotes votes</strong>
+                                        </div>
+                                    </div>
+                                    <div class="progress mt-2" style="height: 20px;">
+                                        <div class="progress-bar bg-success" role="progressbar" 
+                                             style="width: @(GetVotePercentage(law, VoteChoice.For))%" 
+                                             title="Pour: @law.VotesFor">
+                                            @law.VotesFor
+                                        </div>
+                                        <div class="progress-bar bg-danger" role="progressbar" 
+                                             style="width: @(GetVotePercentage(law, VoteChoice.Against))%" 
+                                             title="Contre: @law.VotesAgainst">
+                                            @law.VotesAgainst
+                                        </div>
+                                        <div class="progress-bar bg-warning" role="progressbar" 
+                                             style="width: @(GetVotePercentage(law, VoteChoice.Abstain))%" 
+                                             title="Abstention: @law.VotesAbstain">
+                                            @law.VotesAbstain
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted text-center">Aucune loi n'a encore été votée.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5><i class="bi bi-trophy"></i> Participation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center">
+                            <div class="display-4 text-primary">@(stats.ParticipationRate.ToString("F1"))%</div>
+                            <p class="lead">Taux de participation moyen</p>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between">
+                            <span>Votes "Pour"</span>
+                            <span><strong>@stats.TotalForVotes</strong> (@(stats.ForPercentage.ToString("F1"))%)</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Votes "Contre"</span>
+                            <span><strong>@stats.TotalAgainstVotes</strong> (@(stats.AgainstPercentage.ToString("F1"))%)</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Abstentions</span>
+                            <span><strong>@stats.TotalAbstainVotes</strong> (@(stats.AbstainPercentage.ToString("F1"))%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-calendar-event"></i> Activité récente</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>@stats.LawsThisWeek</strong> lois proposées cette semaine</p>
+                        <p><strong>@stats.VotesThisWeek</strong> votes exprimés cette semaine</p>
+                        <p><strong>@stats.NewCitizensThisWeek</strong> nouveaux citoyens cette semaine</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tendances -->
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-trending-up"></i> Impact de la démocratie distribuée</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h3 class="text-success">100%</h3>
+                                <p>Transparence des votes</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-primary">0</h3>
+                                <p>Intermédiaires politiques</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-info">24h</h3>
+                                <p>Délai moyen de décision</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h3 class="text-warning">?</h3>
+                                <p>Accessibilité citoyenne</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private DemocracyStatistics stats = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatistics();
+    }
+
+    private async Task LoadStatistics()
+    {
+        isLoading = true;
+
+        var laws = await LawService.GetLawsAsync();
+        var activeVotingLaws = await LawService.GetActiveVotingLawsAsync();
+        var citizens = await CitizenService.GetAllCitizensAsync();
+
+        stats = new DemocracyStatistics
+        {
+            TotalLaws = laws.Count,
+            ActiveVotes = activeVotingLaws.Count,
+            TotalVotes = laws.Sum(l => l.TotalVotes),
+            RegisteredCitizens = citizens.Count,
+            MostVotedLaws = laws.Where(l => l.TotalVotes > 0)
+                                .OrderByDescending(l => l.TotalVotes)
+                                .Take(5)
+                                .ToList(),
+            LawsByType = laws.GroupBy(l => l.Type)
+                            .ToDictionary(g => g.Key, g => g.Count()),
+            LawsByStatus = laws.GroupBy(l => l.Status)
+                              .ToDictionary(g => g.Key, g => g.Count()),
+            TotalForVotes = laws.Sum(l => l.VotesFor),
+            TotalAgainstVotes = laws.Sum(l => l.VotesAgainst),
+            TotalAbstainVotes = laws.Sum(l => l.VotesAbstain),
+            LawsThisWeek = laws.Count(l => l.CreatedDate >= DateTime.Now.AddDays(-7)),
+            VotesThisWeek = laws.Where(l => l.CreatedDate >= DateTime.Now.AddDays(-7))
+                               .Sum(l => l.TotalVotes),
+            NewCitizensThisWeek = citizens.Count(c => c.RegistrationDate >= DateTime.Now.AddDays(-7))
+        };
+
+        // Calculate percentages
+        if (stats.TotalVotes > 0)
+        {
+            stats.ForPercentage = (double)stats.TotalForVotes / stats.TotalVotes * 100;
+            stats.AgainstPercentage = (double)stats.TotalAgainstVotes / stats.TotalVotes * 100;
+            stats.AbstainPercentage = (double)stats.TotalAbstainVotes / stats.TotalVotes * 100;
+        }
+
+        stats.ParticipationRate = stats.RegisteredCitizens > 0 
+            ? (double)stats.TotalVotes / (stats.RegisteredCitizens * Math.Max(1, stats.TotalLaws)) * 100 
+            : 0;
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private string GetTypeName(LawType type) => type switch
+    {
+        LawType.Law => "Lois",
+        LawType.Decree => "Décrets",
+        LawType.Amendment => "Amendements",
+        LawType.Referendum => "Référendums",
+        LawType.LocalInitiative => "Initiatives locales",
+        _ => type.ToString()
+    };
+
+    private string GetStatusName(LawStatus status) => status switch
+    {
+        LawStatus.Draft => "Brouillons",
+        LawStatus.UnderReview => "En révision",
+        LawStatus.Voting => "En vote",
+        LawStatus.Passed => "Adoptées",
+        LawStatus.Rejected => "Rejetées",
+        LawStatus.Implemented => "Implémentées",
+        _ => status.ToString()
+    };
+
+    private string GetTypeColor(LawType type) => type switch
+    {
+        LawType.Law => "bg-primary",
+        LawType.Decree => "bg-info",
+        LawType.Amendment => "bg-warning",
+        LawType.Referendum => "bg-danger",
+        LawType.LocalInitiative => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusColor(LawStatus status) => status switch
+    {
+        LawStatus.Draft => "bg-secondary",
+        LawStatus.UnderReview => "bg-warning",
+        LawStatus.Voting => "bg-success",
+        LawStatus.Passed => "bg-primary",
+        LawStatus.Rejected => "bg-danger",
+        LawStatus.Implemented => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private double GetVotePercentage(Law law, VoteChoice choice)
+    {
+        if (law.TotalVotes == 0) return 0;
+        
+        return choice switch
+        {
+            VoteChoice.For => (double)law.VotesFor / law.TotalVotes * 100,
+            VoteChoice.Against => (double)law.VotesAgainst / law.TotalVotes * 100,
+            VoteChoice.Abstain => (double)law.VotesAbstain / law.TotalVotes * 100,
+            _ => 0
+        };
+    }
+
+    public class DemocracyStatistics
+    {
+        public int TotalLaws { get; set; }
+        public int ActiveVotes { get; set; }
+        public int TotalVotes { get; set; }
+        public int RegisteredCitizens { get; set; }
+        public List<Law> MostVotedLaws { get; set; } = new();
+        public Dictionary<LawType, int> LawsByType { get; set; } = new();
+        public Dictionary<LawStatus, int> LawsByStatus { get; set; } = new();
+        public int TotalForVotes { get; set; }
+        public int TotalAgainstVotes { get; set; }
+        public int TotalAbstainVotes { get; set; }
+        public double ForPercentage { get; set; }
+        public double AgainstPercentage { get; set; }
+        public double AbstainPercentage { get; set; }
+        public double ParticipationRate { get; set; }
+        public int LawsThisWeek { get; set; }
+        public int VotesThisWeek { get; set; }
+        public int NewCitizensThisWeek { get; set; }
+    }
+}

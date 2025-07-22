@@ -1,0 +1,437 @@
+@page "/my-votes"
+@rendermode InteractiveAuto
+@using DistributedDemocratie.Models
+@using DistributedDemocratie.Services
+@inject ILawService LawService
+@inject IVotingService VotingService
+@inject ICitizenService CitizenService
+@inject NavigationManager Navigation
+
+<PageTitle>Mes Votes - Démocratie Distribuée</PageTitle>
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4">??? Mes Votes</h1>
+            <p class="lead">Consultez l'historique de vos participations démocratiques et suivez l'évolution des lois que vous avez soutenues.</p>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement de vos votes...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Statistiques personnelles -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-ballot-check display-4"></i>
+                        <h3 class="mt-2">@myVotes.Count</h3>
+                        <p>Votes exprimés</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-hand-thumbs-up display-4"></i>
+                        <h3 class="mt-2">@myVotes.Count(v => v.Choice == VoteChoice.For)</h3>
+                        <p>Votes "Pour"</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-hand-thumbs-down display-4"></i>
+                        <h3 class="mt-2">@myVotes.Count(v => v.Choice == VoteChoice.Against)</h3>
+                        <p>Votes "Contre"</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <i class="bi bi-dash-circle display-4"></i>
+                        <h3 class="mt-2">@myVotes.Count(v => v.Choice == VoteChoice.Abstain)</h3>
+                        <p>Abstentions</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtres -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <select class="form-select" @bind="filterChoice">
+                    <option value="">Tous les votes</option>
+                    <option value="@VoteChoice.For">Votes "Pour"</option>
+                    <option value="@VoteChoice.Against">Votes "Contre"</option>
+                    <option value="@VoteChoice.Abstain">Abstentions</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select class="form-select" @bind="filterStatus">
+                    <option value="">Tous les statuts</option>
+                    <option value="@LawStatus.Voting">En cours</option>
+                    <option value="@LawStatus.Passed">Adoptées</option>
+                    <option value="@LawStatus.Rejected">Rejetées</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-outline-primary w-100" @onclick="ApplyFilters">
+                    <i class="bi bi-funnel"></i> Appliquer les filtres
+                </button>
+            </div>
+        </div>
+
+        @if (!filteredVotes.Any())
+        {
+            <div class="text-center mt-5">
+                <i class="bi bi-ballot display-1 text-muted"></i>
+                <h3 class="mt-3">Aucun vote trouvé</h3>
+                <p class="text-muted">
+                    @if (!myVotes.Any())
+                    {
+                        <text>Vous n'avez pas encore participé aux votes. Commencez dès maintenant !</text>
+                    }
+                    else
+                    {
+                        <text>Aucun vote ne correspond à vos critères de recherche.</text>
+                    }
+                </p>
+                <a href="/active-votes" class="btn btn-primary">
+                    <i class="bi bi-ballot-check"></i> Voir les votes actifs
+                </a>
+            </div>
+        }
+        else
+        {
+            <!-- Liste des votes -->
+            <div class="row">
+                @foreach (var voteInfo in filteredVotes)
+                {
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 @GetVoteCardClass(voteInfo.Vote.Choice)">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="badge @GetTypeColor(voteInfo.Law.Type)">@GetTypeName(voteInfo.Law.Type)</span>
+                                    <span class="badge @GetVoteChoiceColor(voteInfo.Vote.Choice)">
+                                        @GetVoteChoiceName(voteInfo.Vote.Choice)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">@voteInfo.Law.Title</h5>
+                                <p class="card-text">@voteInfo.Law.Description</p>
+                                
+                                @if (!string.IsNullOrEmpty(voteInfo.Vote.Comment))
+                                {
+                                    <div class="alert alert-light">
+                                        <small><strong>Votre commentaire :</strong> @voteInfo.Vote.Comment</small>
+                                    </div>
+                                }
+
+                                <div class="mb-2">
+                                    <small class="text-muted">
+                                        Voté le : @voteInfo.Vote.VotedAt.ToString("dd/MM/yyyy à HH:mm")
+                                    </small>
+                                </div>
+
+                                <!-- Résultats actuels -->
+                                <div class="mt-3">
+                                    <h6>Résultats actuels :</h6>
+                                    <div class="progress mb-1" style="height: 15px;">
+                                        <div class="progress-bar bg-success" role="progressbar" 
+                                             style="width: @(GetVotePercentage(voteInfo.Law, VoteChoice.For))%" 
+                                             title="Pour: @voteInfo.Law.VotesFor">
+                                        </div>
+                                        <div class="progress-bar bg-danger" role="progressbar" 
+                                             style="width: @(GetVotePercentage(voteInfo.Law, VoteChoice.Against))%" 
+                                             title="Contre: @voteInfo.Law.VotesAgainst">
+                                        </div>
+                                        <div class="progress-bar bg-warning" role="progressbar" 
+                                             style="width: @(GetVotePercentage(voteInfo.Law, VoteChoice.Abstain))%" 
+                                             title="Abstention: @voteInfo.Law.VotesAbstain">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <small>Pour: @voteInfo.Law.VotesFor</small>
+                                        <small>Contre: @voteInfo.Law.VotesAgainst</small>
+                                        <small>Abs: @voteInfo.Law.VotesAbstain</small>
+                                    </div>
+                                </div>
+
+                                <div class="mt-2">
+                                    <span class="badge @GetStatusColor(voteInfo.Law.Status)">
+                                        @GetStatusName(voteInfo.Law.Status)
+                                    </span>
+                                    @if (voteInfo.Law.IsVotingActive)
+                                    {
+                                        <span class="badge bg-info ms-1">Vote en cours</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button class="btn btn-outline-primary w-100" @onclick="() => ViewLaw(voteInfo.Law.Id)">
+                                    <i class="bi bi-eye"></i> Voir les détails
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Pagination simple -->
+            @if (filteredVotes.Count > 12)
+            {
+                <div class="text-center mt-4">
+                    <p class="text-muted">Affichage des 12 premiers résultats sur @filteredVotes.Count</p>
+                </div>
+            }
+        }
+
+        <!-- Analyse personnelle -->
+        @if (myVotes.Any())
+        {
+            <div class="row mt-5">
+                <div class="col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Votre Impact Démocratique</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Vos tendances de vote :</h6>
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Votes "Pour"</span>
+                                            <span>@(((double)myVotes.Count(v => v.Choice == VoteChoice.For) / myVotes.Count * 100).ToString("F1"))%</span>
+                                        </div>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: @((double)myVotes.Count(v => v.Choice == VoteChoice.For) / myVotes.Count * 100)%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Votes "Contre"</span>
+                                            <span>@(((double)myVotes.Count(v => v.Choice == VoteChoice.Against) / myVotes.Count * 100).ToString("F1"))%</span>
+                                        </div>
+                                        <div class="progress">
+                                            <div class="progress-bar bg-danger" role="progressbar" 
+                                                 style="width: @((double)myVotes.Count(v => v.Choice == VoteChoice.Against) / myVotes.Count * 100)%">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Lois que vous avez soutenues :</h6>
+                                    <p><strong>@supportedPassedLaws</strong> lois adoptées</p>
+                                    <p><strong>@supportedRejectedLaws</strong> lois rejetées</p>
+                                    <p><strong>@supportedActiveLaws</strong> encore en cours</p>
+                                    <hr>
+                                    <p class="text-success">
+                                        <strong>Taux de réussite : @(successRate.ToString("F1"))%</strong>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Vote> myVotes = new();
+    private List<VoteWithLaw> filteredVotes = new();
+    private bool isLoading = true;
+    private string currentUserId = "user_demo"; // TODO: Get from authentication
+    private string filterChoice = "";
+    private string filterStatus = "";
+    
+    private int supportedPassedLaws = 0;
+    private int supportedRejectedLaws = 0;
+    private int supportedActiveLaws = 0;
+    private double successRate = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMyVotes();
+    }
+
+    private async Task LoadMyVotes()
+    {
+        isLoading = true;
+        
+        // Simuler les votes de l'utilisateur (dans un vrai système, cela viendrait de la DB)
+        var allLaws = await LawService.GetLawsAsync();
+        myVotes = new List<Vote>();
+        
+        // Créer quelques votes d'exemple pour l'utilisateur demo
+        foreach (var law in allLaws.Take(3))
+        {
+            var votes = await VotingService.GetVotesForLawAsync(law.Id);
+            var userVote = votes.FirstOrDefault(v => v.UserId == currentUserId);
+            if (userVote != null)
+            {
+                myVotes.Add(userVote);
+            }
+        }
+
+        await LoadVoteDetails();
+        ApplyFilters();
+        CalculatePersonalStats();
+        
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadVoteDetails()
+    {
+        var voteDetails = new List<VoteWithLaw>();
+        
+        foreach (var vote in myVotes)
+        {
+            var law = await LawService.GetLawByIdAsync(vote.LawId);
+            if (law != null)
+            {
+                voteDetails.Add(new VoteWithLaw { Vote = vote, Law = law });
+            }
+        }
+        
+        filteredVotes = voteDetails.OrderByDescending(v => v.Vote.VotedAt).ToList();
+    }
+
+    private void ApplyFilters()
+    {
+        var filtered = filteredVotes.AsEnumerable();
+        
+        if (!string.IsNullOrEmpty(filterChoice) && Enum.TryParse<VoteChoice>(filterChoice, out var choice))
+        {
+            filtered = filtered.Where(v => v.Vote.Choice == choice);
+        }
+        
+        if (!string.IsNullOrEmpty(filterStatus) && Enum.TryParse<LawStatus>(filterStatus, out var status))
+        {
+            filtered = filtered.Where(v => v.Law.Status == status);
+        }
+        
+        filteredVotes = filtered.Take(12).ToList(); // Limiter pour la performance
+        StateHasChanged();
+    }
+
+    private void CalculatePersonalStats()
+    {
+        var supportedVotes = filteredVotes.Where(v => v.Vote.Choice == VoteChoice.For);
+        
+        supportedPassedLaws = supportedVotes.Count(v => v.Law.Status == LawStatus.Passed);
+        supportedRejectedLaws = supportedVotes.Count(v => v.Law.Status == LawStatus.Rejected);
+        supportedActiveLaws = supportedVotes.Count(v => v.Law.IsVotingActive);
+        
+        var totalSupported = supportedPassedLaws + supportedRejectedLaws;
+        successRate = totalSupported > 0 ? (double)supportedPassedLaws / totalSupported * 100 : 0;
+    }
+
+    private void ViewLaw(int lawId)
+    {
+        Navigation.NavigateTo($"/law/{lawId}");
+    }
+
+    // Méthodes utilitaires pour l'affichage
+    private string GetVoteCardClass(VoteChoice choice) => choice switch
+    {
+        VoteChoice.For => "border-success",
+        VoteChoice.Against => "border-danger",
+        VoteChoice.Abstain => "border-warning",
+        _ => ""
+    };
+
+    private string GetVoteChoiceColor(VoteChoice choice) => choice switch
+    {
+        VoteChoice.For => "bg-success",
+        VoteChoice.Against => "bg-danger", 
+        VoteChoice.Abstain => "bg-warning",
+        _ => "bg-secondary"
+    };
+
+    private string GetVoteChoiceName(VoteChoice choice) => choice switch
+    {
+        VoteChoice.For => "Pour",
+        VoteChoice.Against => "Contre",
+        VoteChoice.Abstain => "Abstention",
+        _ => choice.ToString()
+    };
+
+    private string GetTypeColor(LawType type) => type switch
+    {
+        LawType.Law => "bg-primary",
+        LawType.Decree => "bg-info",
+        LawType.Amendment => "bg-warning",
+        LawType.Referendum => "bg-danger",
+        LawType.LocalInitiative => "bg-success",
+        _ => "bg-secondary"
+    };
+
+    private string GetTypeName(LawType type) => type switch
+    {
+        LawType.Law => "Loi",
+        LawType.Decree => "Décret",
+        LawType.Amendment => "Amendement",
+        LawType.Referendum => "Référendum",
+        LawType.LocalInitiative => "Initiative locale",
+        _ => type.ToString()
+    };
+
+    private string GetStatusColor(LawStatus status) => status switch
+    {
+        LawStatus.Voting => "bg-success",
+        LawStatus.UnderReview => "bg-warning",
+        LawStatus.Passed => "bg-primary",
+        LawStatus.Rejected => "bg-danger",
+        LawStatus.Draft => "bg-secondary",
+        LawStatus.Implemented => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private string GetStatusName(LawStatus status) => status switch
+    {
+        LawStatus.Voting => "En vote",
+        LawStatus.UnderReview => "En révision",
+        LawStatus.Passed => "Adoptée",
+        LawStatus.Rejected => "Rejetée",
+        LawStatus.Draft => "Brouillon",
+        LawStatus.Implemented => "Implémentée",
+        _ => status.ToString()
+    };
+
+    private double GetVotePercentage(Law law, VoteChoice choice)
+    {
+        if (law.TotalVotes == 0) return 0;
+        
+        return choice switch
+        {
+            VoteChoice.For => (double)law.VotesFor / law.TotalVotes * 100,
+            VoteChoice.Against => (double)law.VotesAgainst / law.TotalVotes * 100,
+            VoteChoice.Abstain => (double)law.VotesAbstain / law.TotalVotes * 100,
+            _ => 0
+        };
+    }
+
+    public class VoteWithLaw
+    {
+        public Vote Vote { get; set; } = new();
+        public Law Law { get; set; } = new();
+    }
+}
